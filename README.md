@@ -7,9 +7,9 @@
 
 **Four toolbar buttons**
 - ☰ **Settings** — pick which texture sets to export, set a custom output path
-- :red_circle::blue_circle: **Toggle Red/Blue** — toggles visibility of any layers/folders with `_red` or `_blue` in their name. Works on both folders and individual layers
+- [R/B] **Toggle Red/Blue** — toggles visibility of any layers/folders with `_red` or `_blue` in their name. Works on both folders and individual layers
 - ↓ **Export** — exports diffuse/normal at 512, expmask at 256 as TGA 8-bit
-- ↓:blue_circle: **Export Blue** — exports current diffuse as `_diffuse_blue` without overwriting original
+- ↓[B] **Export Blue** — exports current diffuse as `_diffuse_blue` without overwriting original
 
 **Export path**
 Project must be in a `bakes` folder — exports go to the sibling `texture` folder automatically. If not, you'll be prompted to set a custom path in settings.
