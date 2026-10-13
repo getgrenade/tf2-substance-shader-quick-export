@@ -20,6 +20,7 @@ _action_export  = None
 _action_blue    = None
 _action_pick    = None
 _action_toggle  = None
+_action_diagnose = None
 
 # Session state
 _selected_texture_sets = None   # None = all
@@ -30,13 +31,13 @@ _showing_blue          = False  # Toggle state: False = red visible, True = blue
 
 def diagnose_layer_colors():
     """Print all layer/folder properties to the Substance log."""
-    all_ts = sp_textureset.all_texture_sets()
+    all_ts = (sp_textureset.all_texture_sets() if sp_project.is_open() else [])
     if not all_ts:
         sp_logging.log(sp_logging.WARNING, "TF2Export", "No texture sets found.")
         return
 
     for ts in all_ts:
-        sp_logging.log(sp_logging.INFO, "TF2Export", f"=== Texture Set: {ts.name()} ===")
+        sp_logging.log(sp_logging.INFO, "TF2Export", f"=== Texture Set: {ts.name} ===")
         try:
             stack = ts.get_stack()
             nodes = sp_layerstack.get_root_layer_nodes(stack)
@@ -108,7 +109,7 @@ def try_auto_path():
     Returns (path, ok) where ok=True if the project is in a /bakes/ folder.
     Always returns a path — but ok=False signals the user should set a custom one.
     """
-    sp_file = sp_project.file_path()
+    sp_file = sp_project.file_path() if sp_project.is_open() else None
     if not sp_file:
         raise RuntimeError("No project is open.")
     bakes_dir   = os.path.dirname(sp_file)
@@ -156,10 +157,10 @@ def get_texture_output_path(prompt_if_needed=True):
 
 def get_active_texture_sets():
     global _selected_texture_sets
-    all_ts = sp_textureset.all_texture_sets()
+    all_ts = (sp_textureset.all_texture_sets() if sp_project.is_open() else [])
     if not _selected_texture_sets:
         return all_ts
-    return [ts for ts in all_ts if ts.name() in _selected_texture_sets]
+    return [ts for ts in all_ts if ts.name in _selected_texture_sets]
 
 
 # ── Settings dialog ───────────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ def get_active_texture_sets():
 def open_settings():
     global _selected_texture_sets, _custom_export_path
 
-    all_ts = sp_textureset.all_texture_sets()
+    all_ts = (sp_textureset.all_texture_sets() if sp_project.is_open() else [])
 
     dialog = QtWidgets.QDialog(sp_ui.get_main_window())
     dialog.setWindowTitle("TF2 Export Settings")
@@ -223,8 +224,8 @@ def open_settings():
     checkboxes = []
     if all_ts:
         for ts in all_ts:
-            cb = QtWidgets.QCheckBox(ts.name())
-            if _selected_texture_sets is None or ts.name() in _selected_texture_sets:
+            cb = QtWidgets.QCheckBox(ts.name)
+            if _selected_texture_sets is None or ts.name in _selected_texture_sets:
                 cb.setChecked(True)
             checkboxes.append(cb)
             layout.addWidget(cb)
@@ -286,7 +287,7 @@ def run_export(output_dir, maps):
             "defaultExportPreset": preset_url,
             "exportList"         : [
                 {
-                    "rootPath"    : ts.name(),
+                    "rootPath"    : ts.name,
                     "exportPreset": preset_url,
                     "filter"      : {
                         "outputMaps": [f"$textureSet{s}" for s in suffixes]
@@ -325,8 +326,8 @@ def export_blue():
         with tempfile.TemporaryDirectory() as tmp_dir:
             run_export(tmp_dir, [("_diffuse", BLUE_RESOLUTION)])
             for ts in texture_sets:
-                src = os.path.join(tmp_dir, f"{ts.name()}_diffuse.{FILE_FORMAT}")
-                dst = os.path.join(output_dir, f"{ts.name()}_diffuse_blue.{FILE_FORMAT}")
+                src = os.path.join(tmp_dir, f"{ts.name}_diffuse.{FILE_FORMAT}")
+                dst = os.path.join(output_dir, f"{ts.name}_diffuse_blue.{FILE_FORMAT}")
                 if os.path.isfile(src):
                     shutil.copy2(src, dst)
 
@@ -338,7 +339,7 @@ def toggle_red_blue():
     """Toggle visibility of _red and _blue named layers across all texture sets."""
     global _showing_blue, _btn_toggle
 
-    all_ts = sp_textureset.all_texture_sets()
+    all_ts = (sp_textureset.all_texture_sets() if sp_project.is_open() else [])
     if not all_ts:
         return
 
@@ -375,6 +376,7 @@ def toggle_red_blue():
 def start_plugin():
     global _toolbar, _btn_export, _btn_blue, _btn_pick, _btn_toggle
     global _action_export, _action_blue, _action_pick, _action_toggle
+    global _action_diagnose
 
     main_window = sp_ui.get_main_window()
 
@@ -422,16 +424,18 @@ def start_plugin():
     _action_export = _toolbar.addWidget(_btn_export)
     _action_blue   = _toolbar.addWidget(_btn_blue)
 
-    sp_ui.add_action(
-        sp_ui.ApplicationMenu.File,
-        "TF2 Export: Diagnose Layer Colors",
-        diagnose_layer_colors,
-    )
+    _action_diagnose = QtGui.QAction("TF2 Export: Diagnose Layer Colors", main_window)
+    _action_diagnose.triggered.connect(diagnose_layer_colors)
+    sp_ui.add_action(sp_ui.ApplicationMenu.File, _action_diagnose)
 
 
 def close_plugin():
     global _toolbar, _action_export, _action_blue, _action_pick, _action_toggle
     global _btn_export, _btn_blue, _btn_pick, _btn_toggle
+    global _action_diagnose
+    if _action_diagnose is not None:
+        sp_ui.delete_ui_element(_action_diagnose)
+        _action_diagnose = None
     if _toolbar:
         for action in (_action_pick, _action_toggle, _action_export, _action_blue):
             if action:
